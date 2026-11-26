@@ -1,0 +1,889 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Bass Dokus</title>
+
+<style>
+* {
+    box-sizing: border-box;
+}
+
+body {
+    font-family: Arial, sans-serif;
+    text-align: center;
+    padding: 15px;
+    margin: 0;
+    background: #f4f4f4;
+}
+
+h1 {
+    margin-bottom: 8px;
+}
+
+#diapason {
+    position: relative;
+    width: 100%;
+    max-width: 1280px;
+    margin: 20px auto;
+    line-height: 0;
+}
+
+#imagenBajo {
+    display: block;
+    width: 100%;
+    height: auto !important;
+    object-fit: contain;
+}
+
+/* Marcadores */
+
+.nota{
+    position:absolute;
+    width:24px;
+    height:24px;
+    border-radius:50%;
+
+    display:flex;
+    align-items:center;
+    justify-content:center;
+
+    font-size:13px;
+    font-weight:bold;
+    color:white;
+
+    transform:translate(-50%,-50%);
+    z-index:5;
+    pointer-events:none;
+}
+
+#tonica{
+    background:#22c55e;
+    border:2px solid white;
+    color:white;
+}
+#notaAzul{
+    background:#3b82f6;
+    border:2px solid white;
+    color:white;
+}
+
+/* Botones de respuesta */
+
+#opciones {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(65px, 140px));
+    justify-content: center;
+    gap: 8px;
+    margin: 22px auto;
+    padding: 0 10px;
+}
+
+#opciones button {
+    background: #222;
+    color: white;
+    border: 2px solid transparent;
+    border-radius: 8px;
+    padding: 13px 8px;
+    min-height: 44px;
+    font-size: 16px;
+    font-weight: bold;
+    cursor: pointer;
+    transition: background 0.15s;
+}
+
+#opciones button:hover:not(:disabled) {
+    background: #444;
+}
+
+/* Respuesta correcta */
+
+#opciones button.correcta {
+    background: #16a34a;
+    border-color: #15803d;
+    color: white;
+}
+
+/* Respuesta incorrecta elegida */
+
+#opciones button.incorrecta {
+    background: #dc2626;
+    border-color: #b91c1c;
+    color: white;
+}
+
+#opciones button:disabled {
+    cursor: default;
+    opacity: 1;
+}
+
+#mensaje {
+    min-height: 28px;
+    font-weight: bold;
+    margin: 15px;
+}
+
+#nuevo {
+    background: #2563eb;
+    color: white;
+    border: none;
+    border-radius: 8px;
+    padding: 14px 25px;
+    font-size: 16px;
+    cursor: pointer;
+    margin: 12px;
+}
+
+#nuevo:hover {
+    background: #1d4ed8;
+}
+
+#marcador {
+    margin-top: 15px;
+    font-size: 15px;
+}
+
+#explicacion {
+    font-size: 12px;
+    color: #666;
+    margin-top: 18px;
+}
+
+@media (max-width: 600px) {
+    body {
+        padding: 8px;
+    }
+
+    .nota {
+        width: 13px;
+        height: 13px;
+    }
+
+    #opciones {
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 6px;
+    }
+
+    #opciones button {
+        font-size: 14px;
+        padding: 12px 4px;
+    }
+}
+#niveles {
+    display: flex;
+    justify-content: center;
+    gap: 10px;
+    margin: 20px auto;
+}
+
+.nivel {
+    background: #ddd;
+    color: #222;
+    border: none;
+    border-radius: 8px;
+    padding: 12px 22px;
+    font-size: 15px;
+    font-weight: bold;
+    cursor: pointer;
+}
+
+.nivel.activo {
+    background: #2563eb;
+    color: white;
+}
+
+.nivel:hover {
+    filter: brightness(0.92);
+}    
+</style>
+</head>
+
+<body>
+
+<h1>🎸 Bass Dokus</h1>
+
+<p>¿Qué intervalo es la nota azul respecto a la verde?</p>
+
+<div id="diapason">
+
+    <img id="imagenBajo" src="bass3.png" alt="Diapasón de bajo">
+
+    <div id="tonica" class="nota">T</div>
+
+    <div id="notaAzul" class="nota">?</div>
+
+</div>
+<div id="niveles">
+    <button class="nivel activo" onclick="cambiarNivel(1)">Nivel 1</button>
+    <button class="nivel" onclick="cambiarNivel(2)">Nivel 2</button>
+    <button class="nivel" onclick="cambiarNivel(3)">Nivel 3</button>
+</div>
+<div id="opciones"></div>
+
+<div id="mensaje">¡Identifica el intervalo!</div>
+
+<button id="nuevo" onclick="nuevoEjercicio()">
+    Nuevo ejercicio
+</button>
+
+<div id="marcador">
+    Aciertos: <span id="aciertos">0</span>
+    &nbsp; | &nbsp;
+    Errores: <span id="errores">0</span>
+</div>
+
+<p id="explicacion">
+    Afinación estándar E-A-D-G · 20 trastes. La nota verde es la referencia.
+</p>
+
+<script>
+
+// ======================================
+// CONFIGURACIÓN DEL DIAPASÓN
+// ======================================
+
+const ANCHO_IMAGEN = 1280;
+const ALTO_IMAGEN = 720;
+
+// Coordenadas de las barras de traste
+// medidas sobre la imagen original.
+// Desde la cejuela hacia el extremo izquierdo.
+
+const limitesTrastes = [
+    986,  // Cejuela
+    921,  // Traste 1
+    856,  // Traste 2
+    792,  // Traste 3
+    730,  // Traste 4
+    670,  // Traste 5
+    611,  // Traste 6
+    556,  // Traste 7
+    502,  // Traste 8
+    451,  // Traste 9
+    402,  // Traste 10
+    356,  // Traste 11
+    312,  // Traste 12
+    270,  // Traste 13
+    231,  // Traste 14
+    193,  // Traste 15
+    158,  // Traste 16
+    126,  // Traste 17
+    95,   // Traste 18
+    67,   // Traste 19
+    42    // Traste 20
+];
+
+// Cuerdas y coordenadas verticales.
+// Orden: E, A, D, G.
+
+const cuerdas = [
+
+{
+    nombre:"E",
+    midi:28,
+    yIzq:338,
+    yDer:355
+},
+
+{
+    nombre:"A",
+    midi:33,
+    yIzq:365,
+    yDer:370
+},
+
+{
+    nombre:"D",
+    midi:38,
+    yIzq:393,
+    yDer:388
+},
+
+{
+    nombre:"G",
+    midi:43,
+    yIzq:421,
+    yDer:405
+}
+
+];
+    
+const NUM_TRASTES = 20;
+
+
+// ======================================
+// INTERVALOS
+// ======================================
+
+const intervalos = [
+    { nombre: "T", semitonos: 0 },
+    { nombre: "b2", semitonos: 1 },
+    { nombre: "2", semitonos: 2 },
+    { nombre: "b3", semitonos: 3 },
+    { nombre: "3", semitonos: 4 },
+    { nombre: "4", semitonos: 5 },
+    { nombre: "4#", semitonos: 6 },
+    { nombre: "b5", semitonos: 6 },
+    { nombre: "5", semitonos: 7 },
+    { nombre: "5#", semitonos: 8 },
+    { nombre: "b6", semitonos: 8 },
+    { nombre: "6", semitonos: 9 },
+    { nombre: "bb7", semitonos: 9 },
+    { nombre: "b7", semitonos: 10 },
+    { nombre: "7", semitonos: 11 }
+];
+const patrones = {
+
+"T":[
+    {cuerda:0,traste:0}
+],
+
+"b2":[
+    {cuerda:0,traste:1}
+],
+
+"2":[
+    {cuerda:0,traste:2}
+],
+
+"b3":[
+    {cuerda:0,traste:3}
+],
+
+"3":[
+    {cuerda:0,traste:4}
+],
+
+"4":[
+    {cuerda:1,traste:0}
+],
+
+"4#":[
+    {cuerda:1,traste:1}
+],
+
+"b5":[
+    {cuerda:1,traste:1}
+],
+
+"5":[
+    {cuerda:1,traste:2}
+],
+
+"5#":[
+    {cuerda:1,traste:3}
+],
+
+"b6":[
+    {cuerda:1,traste:3}
+],
+
+"6":[
+    {cuerda:1,traste:4}
+],
+
+"bb7":[
+    {cuerda:1,traste:4}
+],
+
+"b7":[
+    {cuerda:2,traste:0}
+],
+
+"7":[
+    {cuerda:2,traste:1}
+]
+
+};
+
+// ======================================
+// CALCULAR POSICIÓN HORIZONTAL
+// ======================================
+
+function calcularX(traste) {
+
+    // Cuerda al aire: justo detrás de la cejuela.
+    if (traste === 0) {
+        return 1005 / ANCHO_IMAGEN * 100;
+    }
+
+    // Centro exacto del espacio entre dos barras.
+    const barraDerecha = limitesTrastes[traste - 1];
+    const barraIzquierda = limitesTrastes[traste];
+
+    const centro = (barraDerecha + barraIzquierda) / 2;
+
+    return centro / ANCHO_IMAGEN * 100;
+}
+
+
+// ======================================
+// CALCULAR POSICIÓN VERTICAL
+// ======================================
+
+function calcularY(cuerda, xPct){
+
+    const c = cuerdas[cuerda];
+
+    const y =
+        c.yIzq +
+        (c.yDer - c.yIzq) *
+        (xPct / 100);
+
+    return y / ALTO_IMAGEN * 100;
+}
+
+
+// ======================================
+// MIDI
+// ======================================
+
+function obtenerMidi(posicion) {
+    return cuerdas[posicion.cuerda].midi + posicion.traste;
+}
+function buscarPosicionesMidi(midiObjetivo){
+
+    const posiciones = [];
+
+    for(let cuerda = 0; cuerda < 4; cuerda++){
+
+        for(let traste = 0; traste <= NUM_TRASTES; traste++){
+
+            const midi =
+                cuerdas[cuerda].midi +
+                traste;
+
+            if(midi === midiObjetivo){
+
+                posiciones.push({
+
+                    cuerda:cuerda,
+
+                    traste:traste
+
+                });
+
+            }
+
+        }
+
+    }
+
+    return posiciones;
+
+}
+function obtenerSemitonosIntervalo(nombreIntervalo){
+
+    const intervalo = intervalos.find(
+        i => i.nombre === nombreIntervalo
+    );
+
+    return intervalo.semitonos;
+
+}    
+function filtrarPorNivel(
+    posiciones,
+    trasteTonica
+){
+
+    return posiciones.filter(pos => {
+
+        const distancia =
+            Math.abs(
+                pos.traste -
+                trasteTonica
+            );
+
+        return (
+            distancia <=
+            distanciaMaxima[nivelActual]
+        );
+
+    });
+
+}    
+function calcularIntervalo(verde, azul) {
+
+    const notaVerde = obtenerMidi(verde);
+    const notaAzul = obtenerMidi(azul);
+
+    return (notaAzul - notaVerde + 12) % 12;
+}
+function semitonosANombre(semitonos){
+
+    const mapa = {
+        0:"T",
+        1:"b2",
+        2:"2",
+        3:"b3",
+        4:"3",
+        5:"4",
+        6:"b5",
+        7:"5",
+        8:"b6",
+        9:"6",
+        10:"b7",
+        11:"7"
+    };
+
+    return mapa[semitonos];
+}
+
+// ======================================
+// POSICIÓN ALEATORIA
+// ======================================
+
+function posicionAleatoria() {
+
+    return {
+
+        cuerda:
+            Math.floor(Math.random() * 4),
+
+        traste:
+            Math.floor(Math.random() * 15)
+
+    };
+}
+function obtenerPosicionPatron(
+    verde,
+    nombreIntervalo
+){
+    const patron =
+        patrones[nombreIntervalo][0];
+
+    const nuevaCuerda =
+        verde.cuerda +
+        patron.cuerda;
+
+    const nuevoTraste =
+        verde.traste +
+        patron.traste;
+
+    if(
+        nuevaCuerda < 0 ||
+        nuevaCuerda > 3
+    ){
+        return null;
+    }
+
+    if(
+        nuevoTraste < 0 ||
+        nuevoTraste > NUM_TRASTES
+    ){
+        return null;
+    }
+if(
+    nuevaCuerda === verde.cuerda &&
+    nuevoTraste === verde.traste
+){
+    return null;
+}
+    return {
+
+        cuerda:nuevaCuerda,
+        traste:nuevoTraste
+
+    };
+
+
+}
+
+// ======================================
+// COLOCAR MARCADORES
+// ======================================
+
+function colocarNota(elemento, posicion) {
+
+    const x = calcularX(posicion.traste);
+    const y = calcularY(posicion.cuerda, x);
+
+    elemento.style.left = x + "%";
+    elemento.style.top = y + "%";
+
+    if (elemento.id === "tonica") {
+        elemento.textContent = "T";
+    } else {
+        elemento.textContent = "?";
+    }
+}
+
+
+// ======================================
+// VARIABLES DEL JUEGO
+// ======================================
+
+let posicionVerde;
+let posicionAzul;
+let intervaloCorrecto;
+
+let aciertos = 0;
+let errores = 0;
+let respondido = false;
+let nivelActual = 1;
+const distanciaMaxima = {
+
+    1: 3,
+
+    2: 5,
+
+    3: 99
+
+};
+const distanciasNivel = {
+    1: 2,
+    2: 5,
+    3: 20
+};
+
+// ======================================
+// CREAR BOTONES
+// ======================================
+
+const contenedorOpciones = document.getElementById("opciones");
+
+intervalos.forEach(intervalo => {
+
+    const boton = document.createElement("button");
+
+    boton.textContent = intervalo.nombre;
+    boton.dataset.nombre = intervalo.nombre;
+
+    boton.onclick = function() {
+        comprobarRespuesta(intervalo.nombre);
+    };
+
+    contenedorOpciones.appendChild(boton);
+});
+
+
+// ======================================
+// NUEVO EJERCICIO
+// ======================================
+
+function nuevoEjercicio() {
+
+    respondido = false;
+
+    const mensaje = document.getElementById("mensaje");
+
+    mensaje.textContent = "¡Identifica el intervalo!";
+    mensaje.style.color = "#222";
+
+    document.querySelectorAll("#opciones button").forEach(boton => {
+        boton.disabled = false;
+        boton.classList.remove("correcta", "incorrecta");
+    });
+
+   // Elegir posición verde
+posicionVerde = posicionAleatoria();
+
+const intervaloElegido =
+    intervalos[
+        Math.floor(
+            Math.random() *
+            intervalos.length
+        )
+    ];
+
+intervaloCorrecto =
+    intervaloElegido.nombre;
+const semitonosIntervalo =
+    obtenerSemitonosIntervalo(
+        intervaloCorrecto
+    );
+   
+do {
+
+    posicionVerde =
+        posicionAleatoria();
+
+        const midiVerde =
+        obtenerMidi(
+            posicionVerde
+        );
+
+    const midiObjetivo =
+        midiVerde +
+        semitonosIntervalo;
+
+   posicionAzul =
+    obtenerPosicionPatron(
+        posicionVerde,
+        intervaloCorrecto
+    );
+
+console.log(
+    "AZUL",
+    posicionAzul
+);
+
+console.log(
+    "AZUL",
+    posicionAzul
+);
+
+}
+while(!posicionAzul);
+
+
+    // Calcular intervalo
+    const semitonos = calcularIntervalo(
+    posicionVerde,
+    posicionAzul
+);
+
+intervaloCorrecto =
+    semitonosANombre(semitonos);
+console.log(
+    "VERDE OBJETO",
+    posicionVerde
+);
+
+console.log(
+    "AZUL OBJETO",
+    posicionAzul
+);    
+  
+console.log("VERDE", posicionVerde);
+
+console.log(
+    "MIDI VERDE",
+    obtenerMidi(posicionVerde)
+);
+
+console.log("AZUL", posicionAzul);
+
+console.log(
+    "MIDI AZUL",
+    obtenerMidi(posicionAzul)
+);
+
+console.log(
+    "INTERVALO",
+    intervaloCorrecto
+);
+    // Colocar los puntos
+    console.log("VERDE", posicionVerde);
+console.log("AZUL", posicionAzul);
+    colocarNota(
+        document.getElementById("tonica"),
+        posicionVerde
+    );
+
+    colocarNota(
+        document.getElementById("notaAzul"),
+        posicionAzul
+    );
+}
+
+// ======================================
+// COMPROBAR RESPUESTA Y COLOREAR BOTONES
+// ======================================
+
+function comprobarRespuesta(respuesta) {
+console.log(
+        "CORRECTO:",
+        intervaloCorrecto
+    );
+    if (respondido) return;
+
+    respondido = true;
+
+   let respuestasValidas = [];
+
+if(intervaloCorrecto === "b5"){
+    respuestasValidas = [
+        {nombre:"b5"},
+        {nombre:"4#"}
+    ];
+}
+else if(intervaloCorrecto === "b6"){
+    respuestasValidas = [
+        {nombre:"b6"},
+        {nombre:"5#"}
+    ];
+}
+else if(intervaloCorrecto === "6"){
+    respuestasValidas = [
+        {nombre:"6"},
+        {nombre:"bb7"}
+    ];
+}
+else{
+    respuestasValidas = [
+        {nombre:intervaloCorrecto}
+    ];
+}
+    const nombresCorrectos = respuestasValidas.map(
+        intervalo => intervalo.nombre
+    );
+
+    const esCorrecta = nombresCorrectos.includes(respuesta);
+
+    // Marcar las respuestas correctas en verde.
+    document.querySelectorAll("#opciones button").forEach(boton => {
+
+        const nombre = boton.dataset.nombre;
+
+        if (nombresCorrectos.includes(nombre)) {
+            boton.classList.add("correcta");
+        }
+
+        // Si el usuario eligió una respuesta incorrecta,
+        // marcar su botón en rojo.
+        if (nombre === respuesta && !esCorrecta) {
+            boton.classList.add("incorrecta");
+        }
+
+        boton.disabled = true;
+    });
+
+    const mensaje = document.getElementById("mensaje");
+
+    if (esCorrecta) {
+
+        aciertos++;
+
+        mensaje.textContent = "¡Correcto! 🎉";
+        mensaje.style.color = "#16a34a";
+
+    } else {
+
+        errores++;
+
+        mensaje.textContent =
+            "Incorrecto. La respuesta correcta es: " +
+            nombresCorrectos.join(" / ");
+
+        mensaje.style.color = "#dc2626";
+    }
+
+    document.getElementById("aciertos").textContent = aciertos;
+    document.getElementById("errores").textContent = errores;
+}
+
+
+// ======================================
+// INICIAR
+// ======================================
+function cambiarNivel(nivel) {
+
+    nivelActual = nivel;
+
+    document.querySelectorAll(".nivel").forEach(boton => {
+        boton.classList.remove("activo");
+    });
+
+    document.querySelectorAll(".nivel")[nivel - 1]
+        .classList.add("activo");
+    nuevoEjercicio();
+}
+    
+nuevoEjercicio();
+
+</script>
+
+</body>
+</html>
